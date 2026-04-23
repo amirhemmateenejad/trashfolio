@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use App\Console\Commands\CleanExpiredOtpsCommand;
+use App\Console\Commands\CleanExpiredTokensCommand;
+use App\Console\Commands\CleanTrashCommand;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+Schedule::command(CleanExpiredOtpsCommand::class)->everySixHours();
+Schedule::command(CleanExpiredTokensCommand::class)->everySixHours();
+Schedule::command(CleanTrashCommand::class)->dailyAt('12:00');
