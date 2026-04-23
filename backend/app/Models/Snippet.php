@@ -19,7 +19,7 @@ class Snippet extends Model
 
     public function project(): BelongsTo
     {
-        return $this->folder ? $this->folder->project() : $this->belongsTo(Project::class);
+        return $this->belongsTo(Project::class);
     }
 
     public function folder(): BelongsTo

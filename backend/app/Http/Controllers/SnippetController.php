@@ -23,14 +23,14 @@ class SnippetController extends Controller
      */
     public function store()
     {
-        request()->validate([
-            'project_id' => 'required|exists:projects,id',
-            'folder_id' => 'nullable|exists:folders,id',
-            'title' => 'required|string|max:255',
-            'content' => 'required|string',
+        $data = request()->validate([
+            'project_id' => 'required_without:folder_id|exists:projects,id',
+            'folder_id'  => 'required_without:project_id|exists:folders,id',
+            'title'      => 'required|string|max:255',
+            'content'    => 'required|string',
         ]);
 
-        return Snippet::create(request()->all());
+        return Snippet::create($data);
     }
 
     /**
