@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Snippet;
 use App\Models\Tag;
-use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TagController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
@@ -19,7 +20,7 @@ class TagController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store()
     {
         request()->validate([
             'name' => 'required|string|max:50|unique:tags,name',

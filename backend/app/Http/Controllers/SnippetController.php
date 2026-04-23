@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Snippet;
-use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class SnippetController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
@@ -20,7 +21,7 @@ class SnippetController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store()
     {
         request()->validate([
             'project_id' => 'required|exists:projects,id',

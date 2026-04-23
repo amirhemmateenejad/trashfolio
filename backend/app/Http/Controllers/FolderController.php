@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Folder;
-use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class FolderController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store()
     {
         request()->validate([
             'project_id' => 'required|exists:projects,id',
