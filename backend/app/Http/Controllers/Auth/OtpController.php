@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\OtpCode;
+use App\Models\RefreshToken;
 use App\Models\User;
 use App\Rules\IranianMobile;
+use Illuminate\Support\Str;
 
 class OtpController extends Controller
 {
@@ -49,10 +51,17 @@ class OtpController extends Controller
             ['name' => 'User ' . rand(1000, 9999)]
         );
 
-        $token = $user->createToken('api')->plainTextToken;
+        $accessToken = $user->createToken('access')->plainTextToken;
+
+        $refreshToken = RefreshToken::query()->create([
+            'user_id' => $user->id,
+            'token' => Str::random(64),
+            'expires_at' => now()->addDays(30),
+        ]);
 
         return response()->json([
-            'token' => $token,
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken->token,
             'user'  => $user,
         ]);
     }

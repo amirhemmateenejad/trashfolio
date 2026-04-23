@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\TrashController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,7 @@ use App\Http\Controllers\TagController;
 Route::prefix('auth')->group(function () {
     Route::post('/login', [OtpController::class, 'login']);
     Route::post('/verify', [OtpController::class, 'verify']);
+    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
