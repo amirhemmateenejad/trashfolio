@@ -30,4 +30,23 @@ class Project extends Model
     {
         return $this->hasMany(Snippet::class);
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($project) {
+
+            if (!$project->isForceDeleting()) {
+                $project->folders()->each->delete();
+                $project->snippets()->each->delete();
+            }
+
+        });
+
+        static::restoring(function ($project) {
+
+            $project->folders()->onlyTrashed()->each->restore();
+            $project->snippets()->onlyTrashed()->each->restore();
+
+        });
+    }
 }

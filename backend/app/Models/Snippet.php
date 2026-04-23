@@ -31,19 +31,4 @@ class Snippet extends Model
     {
         return $this->belongsToMany(Tag::class, 'snippet_tag');
     }
-
-    protected static function booted()
-    {
-        static::deleting(function ($project) {
-            if (!$project->isForceDeleting()) {
-                $project->folders()->each->delete();
-                $project->snippets()->each->delete();
-            }
-        });
-
-        static::restoring(function ($project) {
-            $project->folders()->onlyTrashed()->each->restore();
-            $project->snippets()->onlyTrashed()->each->restore();
-        });
-    }
 }
