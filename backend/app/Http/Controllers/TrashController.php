@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Folder;
 use App\Models\Project;
 use App\Models\Snippet;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class TrashController extends Controller
 {
+    use AuthorizesRequests;
     public function index()
     {
         $userId = auth()->id();
@@ -32,8 +34,7 @@ class TrashController extends Controller
     {
         $model = $this->resolveModel($type)::onlyTrashed()->findOrFail($id);
 
-        // Policy (بعداً اضافه می‌کنیم)
-        // $this->authorize('restore', $model);
+        $this->authorize('restore', $model);
 
         $model->restore();
 
@@ -46,15 +47,24 @@ class TrashController extends Controller
 
         Project::onlyTrashed()
             ->where('user_id', $userId)
-            ->get()->each->forceDelete();
+            ->get()->each(function($project){
+                $this->authorize('forceDelete', $project);
+                $project->forceDelete();
+            });
 
         Folder::onlyTrashed()
             ->whereHas('project', fn($q) => $q->where('user_id', $userId))
-            ->get()->each->forceDelete();
+            ->get()->each(function($project){
+                $this->authorize('forceDelete', $project);
+                $project->forceDelete();
+            });
 
         Snippet::onlyTrashed()
             ->whereHas('project', fn($q) => $q->where('user_id', $userId))
-            ->get()->each->forceDelete();
+            ->get()->each(function($project){
+                $this->authorize('forceDelete', $project);
+                $project->forceDelete();
+            });
 
         return response()->json(['message' => 'trash emptied']);
     }
