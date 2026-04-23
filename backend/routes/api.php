@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\UserController;
+use App\Http\Controllers\TrashController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\ProjectController;
@@ -33,4 +34,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user', [UserController::class, 'update']);
+
+    Route::get('/trash',[TrashController::class,'index']);
+    Route::post('/trash/restore/{type}/{id}',[TrashController::class,'restore']);
+    Route::delete('/trash/empty',[TrashController::class,'empty']);
 });
