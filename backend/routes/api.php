@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\ProjectController;
@@ -29,4 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Snippet ↔ Tag attach/detach
     Route::post('snippets/{snippet}/tags/{tag}', [TagController::class, 'attach']);
     Route::delete('snippets/{snippet}/tags/{tag}', [TagController::class, 'detach']);
+
+    Route::get('/user', [UserController::class, 'show']);
+    Route::put('/user', [UserController::class, 'update']);
 });
