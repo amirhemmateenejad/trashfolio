@@ -6,28 +6,46 @@ use App\Models\Folder;
 use App\Models\Project;
 use App\Models\Snippet;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class TrashController extends Controller
 {
     use AuthorizesRequests;
-    public function index()
+    public function index(Request $request)
     {
-        $userId = auth()->id();
+        $user = $request->user();
+        $perPage = $request->integer('per_page', 20);
+        $page = $request->integer('page', 1);
 
         $projects = Project::onlyTrashed()
-            ->where('user_id', $userId)
-            ->get();
+            ->where('user_id', $user->id)
+            ->get()->map(fn($x) => tap($x, fn() => $x->type = 'project'));
 
         $folders = Folder::onlyTrashed()
-            ->whereHas('project', fn($q) => $q->where('user_id', $userId))
-            ->get();
+            ->where('user_id', $user->id)
+            ->get()->map(fn($x) => tap($x, fn() => $x->type = 'folder'));
 
         $snippets = Snippet::onlyTrashed()
-            ->whereHas('project', fn($q) => $q->where('user_id', $userId))
-            ->get();
+            ->where('user_id', $user->id)
+            ->get()->map(fn($x) => tap($x, fn() => $x->type = 'snippet'));
 
-        return compact('projects', 'folders', 'snippets');
+        $combined = $projects
+            ->merge($folders)
+            ->merge($snippets)
+            ->sortByDesc('deleted_at')
+            ->values();
+
+        $paginated = new LengthAwarePaginator(
+            $combined->forPage($page, $perPage),
+            $combined->count(),
+            $perPage,
+            $page,
+            ['path' => url()->current()]
+        );
+
+        return response()->json($paginated);
     }
 
     public function restore($type, $id)

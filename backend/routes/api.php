@@ -13,7 +13,7 @@ use App\Http\Controllers\TagController;
 Route::prefix('auth')->group(function () {
     Route::post('/login', [OtpController::class, 'login']);
     Route::post('/verify', [OtpController::class, 'verify']);
-    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+    Route::post('/refresh', [AuthController::class, 'refresh']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -31,7 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('tags', TagController::class)->only(['index', 'store']);
 
     // Snippet ↔ Tag attach/detach
-    Route::post('snippets/{snippet}/tags/{tag}', [TagController::class, 'attach']);
+    Route::post('snippets/{snippet}/tags', [TagController::class, 'attach']);
     Route::delete('snippets/{snippet}/tags/{tag}', [TagController::class, 'detach']);
 
     Route::get('/user', [UserController::class, 'show']);

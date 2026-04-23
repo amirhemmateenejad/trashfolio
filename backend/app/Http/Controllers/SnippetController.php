@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Snippet;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
 
 class SnippetController extends Controller
 {
@@ -11,11 +12,18 @@ class SnippetController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return Snippet::where('project_id', request('project_id'))
-            ->latest()
-            ->get();
+        $this->authorize('viewAny', Snippet::class);
+
+        $perPage = $request->integer('per_page', 50);
+
+        $snippets = Snippet::query()
+            ->where('user_id', $request->user()->id)
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        return response()->json($snippets);
     }
 
     /**
