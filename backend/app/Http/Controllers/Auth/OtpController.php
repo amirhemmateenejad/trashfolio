@@ -5,13 +5,14 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\OtpCode;
 use App\Models\User;
+use App\Rules\IranianMobile;
 
 class OtpController extends Controller
 {
     public function login()
     {
         request()->validate([
-            'mobile' => 'required|string|max:11',
+            'mobile' => ['required','string','max:11',new IranianMobile()],
         ]);
 
         OtpCode::query()->create([
