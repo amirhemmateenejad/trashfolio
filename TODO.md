@@ -112,34 +112,92 @@ Branch: `claude/fervent-rubin-26g9k1`
 - [x] `TagService` extracted (resolveIds, resolveNamesForUser)
 
 ### Performance (J)
-- [ ] Eager-load audit: assert no N+1 on snippet listing with tags (J81)
-- [ ] Eager-load audit: assert no N+1 on folder tree listing (J82)
-- [ ] Full-text index migration verification (J84)
+- [x] Eager-load audit: assert no N+1 on snippet listing with tags (J81, J81b)
+- [x] Eager-load audit: assert no N+1 on folder tree listing (J82) — fixed `children.snippets` eager load
+- [x] Full-text index migration verification (J84a–J84c)
 
 ### Multi-Tenancy Audit (G)
-- [ ] End-to-end cross-user isolation test across all resources (G73)
-- [ ] Cross-project folder/snippet/tag mismatch tests (G74)
-- [ ] Defensive ID validation test sweep (G75)
+- [x] End-to-end cross-user isolation test across all resources (G73a–G73g)
+- [x] Cross-project folder/snippet/tag mismatch tests (G74a–G74e)
+- [x] Defensive ID validation test sweep (G75a–G75f)
 
 ### Edge Cases (K)
-- [ ] Root snippets (`folder_id = null`) list correctly (K85)
-- [ ] Moving folder with many nested children (K86)
-- [ ] Tag deletion when attached to many snippets (K87)
+- [x] Root snippets (`folder_id = null`) list correctly (K85a–K85d)
+- [x] Moving folder with many nested children (K86a–K86d)
+- [x] Tag deletion when attached to many snippets (K87a–K87c)
+
+### PHPDocs & OpenAPI
+- [x] PHP 8 `#[OA\*]` attribute annotations on all 11 controllers
+- [x] Global `@OA\Info`, `@OA\SecurityScheme`, `@OA\Tag` in `Controller.php`
+- [x] `@param`/`@return` PHPDoc on all models, services, and validation rules
+- [x] `config/l5-swagger.php` configured — docs at `storage/api-docs/api-docs.json`
 
 ---
 
-## Phase 3 — Frontend (Future)
+## Phase 3 — Frontend ✅ IN PROGRESS
 
-- [ ] Vue 3 SPA setup with Vite
-- [ ] Pinia store: auth, projects, snippets, tags
-- [ ] OTP login flow
-- [ ] Project sidebar
-- [ ] Folder tree navigation
-- [ ] Snippet editor (Monaco)
-- [ ] Tag management UI
-- [ ] Search interface
-- [ ] Trash manager UI
-- [ ] Dark mode
+> Client app: `client/` — Vue 3 + Vite + Pinia + Vue Router + Axios + Vitest
+
+### Phase 3A — Foundation & Landing ✅ IN PROGRESS
+- [x] Vue 3 + Vite scaffold (`client/`)
+- [x] Pinia store setup
+- [x] Vue Router setup
+- [x] Axios HTTP client installed
+- [x] Auth store (`useAuthStore`) — token, user, isLoggedIn, login/logout
+- [x] API composable (`useApi`) — axios instance with Bearer token interceptor
+- [x] Landing page (`HomeView.vue`) — project description, feature highlights, login/dashboard CTA
+- [x] Router guard — redirect unauthenticated users away from protected routes
+- [x] Vitest unit tests for auth store
+- [x] Vitest component tests for landing page
+- [ ] OTP login flow (`/login` page — mobile number → OTP code → token)
+- [ ] OTP login component tests
+
+### Phase 3B — Auth Flow
+- [ ] `LoginView.vue` — two-step OTP form (mobile → code)
+- [ ] `useOtp` composable — wraps `POST /api/auth/login` and `POST /api/auth/verify`
+- [ ] Token stored in `localStorage`, injected into axios via auth store
+- [ ] On verify success → redirect to `/dashboard`
+- [ ] Auto-redirect if token already present
+- [ ] Tests: OTP composable, LoginView component
+
+### Phase 3C — Dashboard Shell & Projects
+- [ ] `DashboardLayout.vue` — top nav, left sidebar, main content slot
+- [ ] `ProjectSidebar.vue` — list projects, create project, active highlight
+- [ ] `useProjectsStore` (Pinia) — CRUD, active project state
+- [ ] `GET /api/projects` loaded on dashboard mount
+- [ ] Create/rename/delete project modals
+- [ ] Tests: projects store, ProjectSidebar component
+
+### Phase 3D — Folder Tree
+- [ ] `FolderTree.vue` — recursive folder display, expand/collapse
+- [ ] `useFoldersStore` (Pinia) — CRUD, tree shape from flat list
+- [ ] Drag-and-drop folder reorder / reparent (optional, Phase 3F)
+- [ ] Create/rename/delete folder inline
+- [ ] Tests: foldersStore tree builder, FolderTree component
+
+### Phase 3E — Snippet Editor
+- [ ] `SnippetList.vue` — list snippets in current folder/project, search filter
+- [ ] `SnippetEditor.vue` — Monaco editor, language selector, tag pills
+- [ ] `useSnippetsStore` (Pinia) — CRUD, current snippet state
+- [ ] Auto-save on blur (debounced PUT)
+- [ ] Keyboard shortcut: `Cmd+S` / `Ctrl+S` save
+- [ ] Tests: snippetsStore, SnippetEditor component
+
+### Phase 3F — Tags, Search & Trash
+- [ ] `TagManager.vue` — list/create/delete tags, color picker
+- [ ] `useTagsStore` (Pinia) — CRUD
+- [ ] `SearchView.vue` — `GET /api/search` with filters, paginated results
+- [ ] `TrashView.vue` — list trashed items, restore/permanent delete
+- [ ] Autocomplete in snippet editor tag field (`GET /api/autocomplete`)
+- [ ] Tests: tagsStore, SearchView, TrashView
+
+### Phase 3G — Polish & DX
+- [ ] Dark / light mode toggle (CSS variable based)
+- [ ] Responsive layout (mobile sidebar drawer)
+- [ ] Toast notification system (`useToast` composable)
+- [ ] Error boundary component
+- [ ] Loading skeleton components
+- [ ] `e2e/` Playwright smoke tests: login → create project → create snippet → search
 
 ---
 
