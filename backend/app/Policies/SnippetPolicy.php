@@ -12,26 +12,26 @@ class SnippetPolicy
 
     public function view(User $user, Snippet $snippet): bool
     {
-        return $snippet->project->user_id === $user->id;
+        return $snippet->owner_user_id === $user->id;
     }
 
     public function update(User $user, Snippet $snippet): bool
     {
-        return $snippet->project->user_id === $user->id;
+        return $snippet->owner_user_id === $user->id;
     }
 
     public function delete(User $user, Snippet $snippet): bool
     {
-        return $snippet->project->user_id === $user->id;
+        return $snippet->owner_user_id === $user->id;
     }
 
     public function restore(User $user, Snippet $snippet): bool
     {
-        return $snippet->project->user_id === $user->id;
+        return $snippet->owner_user_id === $user->id;
     }
 
     public function forceDelete(User $user, Snippet $snippet): bool
     {
-        return $snippet->project->user_id === $user->id;
+        return $snippet->owner_user_id === $user->id;
     }
 }
