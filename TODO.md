@@ -94,13 +94,13 @@ Branch: `claude/fervent-rubin-26g9k1`
 ## Phase 2 — Backend Hardening (Next)
 
 ### Snippets — Missing Filters
-- [ ] `GET /api/snippets?folder_id=` filter (D51)
-- [ ] `GET /api/snippets?language=` filter (D52)
-- [ ] `GET /api/projects/{project}/snippets` — project-scoped snippet listing (D50)
+- [x] `GET /api/snippets?folder_id=` filter (D51)
+- [x] `GET /api/snippets?language=` filter (D52)
+- [x] `GET /api/projects/{project}/snippets` — project-scoped snippet listing (D50)
 
 ### Folder Tree
-- [ ] Loop/cycle detection when setting `parent_id` (C31–C32)
-- [ ] Move folder between parents — validation that target is in same project (C34)
+- [x] Loop/cycle detection when setting `parent_id` (C31–C32)
+- [x] Move folder between parents — validation that target is in same project (C34)
 
 ### API Contract & Validation (H)
 - [ ] Consistent JSON error response format across all endpoints (H76)
