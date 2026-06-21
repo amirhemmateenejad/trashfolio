@@ -5,7 +5,7 @@ Branch: `claude/fervent-rubin-26g9k1`
 
 ---
 
-## Phase 1 — Backend MVP ✅ COMPLETE
+## Phase 1 — Backend MVP ✅ FULLY COMPLETE
 
 ### Authentication (A)
 - [x] OTP request endpoint (`POST /api/auth/login`)
@@ -36,8 +36,8 @@ Branch: `claude/fervent-rubin-26g9k1`
 - [x] `FolderPolicy` — ownership via project chain, trashed project awareness
 - [x] `FolderFactory`
 - [x] Feature tests: `FolderCrudTest` (C28–C36)
-- [ ] Loop/cycle detection in `parent_id` (C31–C32 from TEST_SCENARIOS — not yet implemented)
-- [ ] Move folder (change `parent_id`) with loop prevention (C34)
+- [x] Loop/cycle detection in `parent_id` (C31–C32 from TEST_SCENARIOS)
+- [x] Move folder (change `parent_id`) with loop prevention (C34)
 
 ### Snippets (D)
 - [x] CRUD: `POST /api/snippets`, `GET /api/snippets`, `GET /api/snippets/{id}`, `PUT /api/snippets/{id}`, `DELETE /api/snippets/{id}`
@@ -50,9 +50,9 @@ Branch: `claude/fervent-rubin-26g9k1`
 - [x] `SnippetPolicy` — full set including `restore`/`forceDelete` with trashed parent awareness
 - [x] `SnippetFactory`
 - [x] Feature tests: `SnippetCrudTest` (D37–D54)
-- [ ] Filter snippets by folder (`GET /api/snippets?folder_id=`) (D51)
-- [ ] Filter snippets by language (`GET /api/snippets?language=`) (D52)
-- [ ] Nested snippet listing per project (`GET /api/projects/{project}/snippets`) (D50 full spec)
+- [x] Filter snippets by folder (`GET /api/snippets?folder_id=`) (D51)
+- [x] Filter snippets by language (`GET /api/snippets?language=`) (D52)
+- [x] Nested snippet listing per project (`GET /api/projects/{project}/snippets`) (D50 full spec)
 
 ### Tags (E)
 - [x] `user_id` and `slug` columns — per-user unique by slug
@@ -71,7 +71,7 @@ Branch: `claude/fervent-rubin-26g9k1`
 - [x] `tag_ids` resolves only caller-owned tags; foreign tag IDs yield zero results
 - [x] `shouldBeSearchable()` excludes soft-deleted snippets
 - [x] Feature tests: `SearchTest` (F67–F72 + extras)
-- [ ] Autocomplete endpoint (not in TEST_SCENARIOS MVP scope)
+- [x] Autocomplete endpoint (`GET /api/autocomplete?q=&types[]=&limit=`)
 
 ### Trash System
 - [x] `GET /api/trash` — paginated list of all user's soft-deleted items (projects, folders, snippets)
