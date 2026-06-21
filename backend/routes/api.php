@@ -22,6 +22,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Projects
     Route::apiResource('projects', ProjectController::class);
 
+    // Project-scoped snippet listing
+    Route::get('projects/{project}/snippets', [SnippetController::class, 'indexForProject']);
+
     // Folders
     Route::apiResource('folders', FolderController::class)->except(['index']);
 

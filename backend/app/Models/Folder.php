@@ -37,6 +37,23 @@ class Folder extends Model
         return $this->hasMany(Snippet::class);
     }
 
+    public function isAncestorOf(int $folderId): bool
+    {
+        $visited = [];
+        $current = Folder::find($folderId);
+        while ($current && $current->parent_id) {
+            if (in_array($current->parent_id, $visited, true)) {
+                break; // existing cycle guard
+            }
+            if ($current->parent_id === $this->id) {
+                return true;
+            }
+            $visited[] = $current->parent_id;
+            $current = Folder::find($current->parent_id);
+        }
+        return false;
+    }
+
     protected static function booted()
     {
         static::deleting(function ($folder) {

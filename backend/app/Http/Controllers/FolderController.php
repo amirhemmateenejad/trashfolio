@@ -26,12 +26,13 @@ class FolderController extends Controller
         if ($validated['parent_id'] ?? false) {
             $parent = Folder::findOrFail($validated['parent_id']);
 
-            if ($parent->project->user_id !== $request->user()->id || $parent->project_id !== $project->id) {
-                abort(403, 'Invalid parent folder');
+            if ($parent->project_id !== $project->id) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['parent_id' => ['Parent folder must belong to the same project.']],
+                ], 422);
             }
         }
-
-        $project = Project::find($validated['project_id']);
 
         $this->authorize('create', [Folder::class, $project]);
 
@@ -56,13 +57,41 @@ class FolderController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request,Folder $folder)
+    public function update(Request $request, Folder $folder)
     {
         $this->authorize('update', $folder);
 
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title'     => 'sometimes|required|string|max:255',
+            'parent_id' => 'sometimes|nullable|exists:folders,id',
         ]);
+
+        if (array_key_exists('parent_id', $validated) && $validated['parent_id'] !== null) {
+            $newParentId = $validated['parent_id'];
+
+            if ($newParentId === $folder->id) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['parent_id' => ['A folder cannot be its own parent.']],
+                ], 422);
+            }
+
+            $newParent = Folder::findOrFail($newParentId);
+
+            if ($newParent->project_id !== $folder->project_id) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['parent_id' => ['Parent folder must belong to the same project.']],
+                ], 422);
+            }
+
+            if ($folder->isAncestorOf($newParentId)) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['parent_id' => ['Moving this folder here would create a cycle.']],
+                ], 422);
+            }
+        }
 
         $folder->update($validated);
 

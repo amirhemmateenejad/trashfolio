@@ -15,12 +15,41 @@ class SnippetController extends Controller
 
     public function index(Request $request)
     {
+        $request->validate([
+            'folder_id' => 'nullable|integer|exists:folders,id',
+            'language'  => 'nullable|string|max:50',
+            'per_page'  => 'nullable|integer|min:1|max:100',
+        ]);
+
         $perPage = min($request->integer('per_page', 20), 100);
 
         $snippets = Snippet::query()
-            ->where(function ($q) use ($request) {
-                $q->whereHas('project', fn($q) => $q->where('user_id', $request->user()->id));
-            })
+            ->whereHas('project', fn($q) => $q->where('user_id', $request->user()->id))
+            ->when($request->filled('folder_id'), fn($q) => $q->where('folder_id', $request->integer('folder_id')))
+            ->when($request->filled('language'), fn($q) => $q->where('language', $request->string('language')))
+            ->with('tags')
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        return response()->json($snippets);
+    }
+
+    public function indexForProject(Request $request, Project $project)
+    {
+        $this->authorize('view', $project);
+
+        $request->validate([
+            'folder_id' => 'nullable|integer|exists:folders,id',
+            'language'  => 'nullable|string|max:50',
+            'per_page'  => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $perPage = min($request->integer('per_page', 20), 100);
+
+        $snippets = Snippet::query()
+            ->where('project_id', $project->id)
+            ->when($request->filled('folder_id'), fn($q) => $q->where('folder_id', $request->integer('folder_id')))
+            ->when($request->filled('language'), fn($q) => $q->where('language', $request->string('language')))
             ->with('tags')
             ->orderByDesc('created_at')
             ->paginate($perPage);
