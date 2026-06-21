@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AutocompleteController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\TrashController;
@@ -40,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Search
     Route::get('/search', SearchController::class);
+    Route::get('/autocomplete', AutocompleteController::class);
 
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user', [UserController::class, 'update']);
