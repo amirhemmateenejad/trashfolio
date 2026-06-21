@@ -10,6 +10,16 @@ class SnippetPolicy
 {
     use HandlesAuthorization;
 
+    public function viewAny(User $user): bool
+    {
+        return true;
+    }
+
+    public function create(User $user): bool
+    {
+        return true;
+    }
+
     public function view(User $user, Snippet $snippet): bool
     {
         return $snippet->owner_user_id === $user->id;

@@ -2,132 +2,200 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Folder;
+use App\Models\Project;
 use App\Models\Snippet;
+use App\Models\Tag;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 
 class SnippetController extends Controller
 {
     use AuthorizesRequests;
-    /**
-     * Display a listing of the resource.
-     */
+
     public function index(Request $request)
     {
-        $this->authorize('viewAny', Snippet::class);
-
-        $perPage = $request->integer('per_page', 50);
+        $perPage = min($request->integer('per_page', 20), 100);
 
         $snippets = Snippet::query()
-            ->whereHas('project', fn($q) => $q->where('user_id', $request->user()->id))
-            ->orWhereHas('folder.project', fn($q) => $q->where('user_id', $request->user()->id))
+            ->where(function ($q) use ($request) {
+                $q->whereHas('project', fn($q) => $q->where('user_id', $request->user()->id));
+            })
+            ->with('tags')
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
         return response()->json($snippets);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store()
+    public function store(Request $request)
     {
-        $this->authorize('create', Snippet::class);
-
-        $data = request()->validate([
-            'project_id' => 'required_without:folder_id|exists:projects,id',
-            'folder_id'  => 'required_without:project_id|exists:folders,id',
+        $data = $request->validate([
+            'project_id' => 'required|exists:projects,id',
+            'folder_id'  => 'nullable|exists:folders,id',
             'title'      => 'required|string|max:255',
             'content'    => 'required|string',
+            'language'   => 'nullable|string|max:50',
+            'tag_ids'    => 'nullable|array',
+            'tag_ids.*'  => 'integer|exists:tags,id',
+            'tag_names'  => 'nullable|array',
+            'tag_names.*' => 'string|max:50',
         ]);
 
-        $snippet = Snippet::create($data);
+        $project = Project::findOrFail($data['project_id']);
 
-        return $snippet->load('tags');
+        if ($project->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        if (!empty($data['folder_id'])) {
+            $folder = Folder::findOrFail($data['folder_id']);
+            if ($folder->project_id !== $project->id) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['folder_id' => ['Folder does not belong to the specified project.']],
+                ], 422);
+            }
+        }
+
+        $snippet = Snippet::create([
+            'project_id' => $data['project_id'],
+            'folder_id'  => $data['folder_id'] ?? null,
+            'title'      => $data['title'],
+            'content'    => $data['content'],
+            'language'   => $data['language'] ?? null,
+        ]);
+
+        $tagIds = $this->resolveTagIds($request->user(), $data);
+
+        if (!empty($tagIds)) {
+            $snippet->tags()->sync($tagIds);
+        }
+
+        return response()->json($snippet->load('tags'), 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Snippet $snippet)
     {
         $this->authorize('view', $snippet);
-        return $snippet->load('tags');
+
+        return response()->json($snippet->load('tags'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Snippet $snippet)
+    public function update(Request $request, Snippet $snippet)
     {
         $this->authorize('update', $snippet);
 
-        request()->validate([
-            'title' => 'required|string|max:255',
-            'content' => 'required|string',
+        $data = $request->validate([
+            'title'      => 'sometimes|required|string|max:255',
+            'content'    => 'sometimes|required|string',
+            'language'   => 'nullable|string|max:50',
+            'folder_id'  => 'nullable|exists:folders,id',
+            'tag_ids'    => 'nullable|array',
+            'tag_ids.*'  => 'integer|exists:tags,id',
+            'tag_names'  => 'nullable|array',
+            'tag_names.*' => 'string|max:50',
         ]);
 
-        $snippet->update(request()->only('title', 'content'));
+        if (array_key_exists('folder_id', $data) && $data['folder_id'] !== null) {
+            $folder = Folder::findOrFail($data['folder_id']);
+            if ($folder->project_id !== $snippet->project_id) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['folder_id' => ['Folder does not belong to the snippet\'s project.']],
+                ], 422);
+            }
+        }
 
-        return $snippet->load('tags');
+        $snippet->update(array_filter([
+            'title'     => $data['title'] ?? null,
+            'content'   => $data['content'] ?? null,
+            'language'  => $data['language'] ?? null,
+            'folder_id' => array_key_exists('folder_id', $data) ? $data['folder_id'] : $snippet->folder_id,
+        ], fn($v) => $v !== null));
+
+        if (array_key_exists('folder_id', $data)) {
+            $snippet->folder_id = $data['folder_id'];
+            $snippet->save();
+        }
+
+        if (array_key_exists('tag_ids', $data) || array_key_exists('tag_names', $data)) {
+            $tagIds = $this->resolveTagIds($request->user(), $data);
+            $snippet->tags()->sync($tagIds);
+        }
+
+        return response()->json($snippet->load('tags'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Snippet $snippet)
     {
         $this->authorize('delete', $snippet);
         $snippet->delete();
+
         return response()->json(['message' => 'deleted']);
     }
 
     public function search(Request $request)
     {
         $request->validate([
-            'q' => 'required|string|max:200',
+            'q'          => 'required|string|max:200',
             'project_id' => 'nullable|integer',
             'folder_id'  => 'nullable|integer',
+            'tag_ids'    => 'nullable|array',
+            'tag_ids.*'  => 'integer',
+            'language'   => 'nullable|string|max:50',
         ]);
 
-        $userId = auth()->id();
-
-        $filters = "user_id = $userId";
+        $userId = $request->user()->id;
+        $filters = ["user_id = $userId"];
 
         if ($request->project_id) {
-            $filters .= " AND project_id = {$request->project_id}";
+            $filters[] = "project_id = {$request->project_id}";
         }
-
         if ($request->folder_id) {
-            $filters .= " AND folder_id = {$request->folder_id}";
+            $filters[] = "folder_id = {$request->folder_id}";
         }
 
-        $results = Snippet::search($request->q, function ($meili, $query, $options) use ($filters) {
-            $options['filter'] = $filters;
+        $filterString = implode(' AND ', $filters);
+
+        $results = Snippet::search($request->q, function ($meili, $query, $options) use ($filterString) {
+            $options['filter'] = $filterString;
             return $meili->search($query, $options);
         })->paginate(20);
 
         return response()->json($results);
     }
 
-    public function autocomplete(Request $request)
+    private function resolveTagIds($user, array $data): array
     {
-        $request->validate([
-            'q' => 'required|string|max:100',
-        ]);
+        $tagIds = [];
 
-        $userId = auth()->id();
+        if (!empty($data['tag_ids'])) {
+            $tags = Tag::whereIn('id', $data['tag_ids'])->get();
 
-        return Snippet::search($request->q, function ($meili, $query, $options) use ($userId) {
-            $options['filter'] = "user_id = $userId";
-            $options['limit'] = 5;
-            return $meili->search($query, $options);
-        })
-            ->take(5)
-            ->get()
-            ->map(fn($s) => [
-                'id'    => $s->id,
-                'title' => $s->title,
-            ]);
+            foreach ($tags as $tag) {
+                if ($tag->user_id !== $user->id) {
+                    abort(403, 'One or more tags do not belong to you.');
+                }
+                $tagIds[] = $tag->id;
+            }
+
+            if (count($tagIds) !== count($data['tag_ids'])) {
+                abort(422, 'One or more tag IDs are invalid.');
+            }
+        }
+
+        if (!empty($data['tag_names'])) {
+            foreach ($data['tag_names'] as $name) {
+                $slug = \Illuminate\Support\Str::slug($name);
+                $tag = $user->tags()->firstOrCreate(
+                    ['slug' => $slug],
+                    ['name' => $name, 'slug' => $slug]
+                );
+                $tagIds[] = $tag->id;
+            }
+        }
+
+        return array_unique($tagIds);
     }
 }

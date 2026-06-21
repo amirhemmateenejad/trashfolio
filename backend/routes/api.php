@@ -28,16 +28,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('snippets', SnippetController::class);
 
     // Tags
-    Route::apiResource('tags', TagController::class)->only(['index', 'store']);
+    Route::apiResource('tags', TagController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // Snippet ↔ Tag attach/detach
-    Route::post('snippets/{snippet}/tags', [TagController::class, 'attach']);
+    Route::post('snippets/{snippet}/tags/{tag}', [TagController::class, 'attach']);
     Route::delete('snippets/{snippet}/tags/{tag}', [TagController::class, 'detach']);
 
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user', [UserController::class, 'update']);
 
-    Route::get('/trash',[TrashController::class,'index']);
-    Route::post('/trash/restore/{type}/{id}',[TrashController::class,'restore']);
-    Route::delete('/trash/empty',[TrashController::class,'empty']);
+    Route::get('/trash', [TrashController::class, 'index']);
+    Route::post('/trash/restore/{type}/{id}', [TrashController::class, 'restore']);
+    Route::delete('/trash/empty', [TrashController::class, 'empty']);
 });
