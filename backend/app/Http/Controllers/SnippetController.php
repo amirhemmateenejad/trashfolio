@@ -2,25 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Folder;
+use App\Http\Requests\ListSnippetsRequest;
+use App\Http\Requests\StoreSnippetRequest;
+use App\Http\Requests\UpdateSnippetRequest;
+use App\Http\Resources\SnippetResource;
 use App\Models\Project;
 use App\Models\Snippet;
-use App\Models\Tag;
+use App\Services\TagService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\Request;
 
 class SnippetController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request)
-    {
-        $request->validate([
-            'folder_id' => 'nullable|integer|exists:folders,id',
-            'language'  => 'nullable|string|max:50',
-            'per_page'  => 'nullable|integer|min:1|max:100',
-        ]);
+    public function __construct(private TagService $tagService) {}
 
+    public function index(ListSnippetsRequest $request)
+    {
         $perPage = min($request->integer('per_page', 20), 100);
 
         $snippets = Snippet::query()
@@ -31,18 +29,12 @@ class SnippetController extends Controller
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
-        return response()->json($snippets);
+        return SnippetResource::collection($snippets);
     }
 
-    public function indexForProject(Request $request, Project $project)
+    public function indexForProject(ListSnippetsRequest $request, Project $project)
     {
         $this->authorize('view', $project);
-
-        $request->validate([
-            'folder_id' => 'nullable|integer|exists:folders,id',
-            'language'  => 'nullable|string|max:50',
-            'per_page'  => 'nullable|integer|min:1|max:100',
-        ]);
 
         $perPage = min($request->integer('per_page', 20), 100);
 
@@ -54,38 +46,20 @@ class SnippetController extends Controller
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
-        return response()->json($snippets);
+        return SnippetResource::collection($snippets);
     }
 
-    public function store(Request $request)
+    public function store(StoreSnippetRequest $request)
     {
-        $data = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'folder_id'  => 'nullable|exists:folders,id',
-            'title'      => 'required|string|max:255',
-            'content'    => 'required|string',
-            'language'   => 'nullable|string|max:50',
-            'tag_ids'    => 'nullable|array',
-            'tag_ids.*'  => 'integer|exists:tags,id',
-            'tag_names'  => 'nullable|array',
-            'tag_names.*' => 'string|max:50',
-        ]);
-
+        $data    = $request->validated();
         $project = Project::findOrFail($data['project_id']);
 
         if ($project->user_id !== $request->user()->id) {
             abort(403);
         }
 
-        if (!empty($data['folder_id'])) {
-            $folder = Folder::findOrFail($data['folder_id']);
-            if ($folder->project_id !== $project->id) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors'  => ['folder_id' => ['Folder does not belong to the specified project.']],
-                ], 422);
-            }
-        }
+        // tag_ids ownership check (403 for foreign tags, consistent with attach/detach behavior)
+        $this->assertTagsOwnedByUser($request->user(), $data['tag_ids'] ?? []);
 
         $snippet = Snippet::create([
             'project_id' => $data['project_id'],
@@ -95,46 +69,29 @@ class SnippetController extends Controller
             'language'   => $data['language'] ?? null,
         ]);
 
-        $tagIds = $this->resolveTagIds($request->user(), $data);
+        $tagIds = $this->tagService->resolveIds($request->user(), $data['tag_ids'] ?? [], $data['tag_names'] ?? []);
 
-        if (!empty($tagIds)) {
+        if ($tagIds) {
             $snippet->tags()->sync($tagIds);
         }
 
-        return response()->json($snippet->load('tags'), 201);
+        return (new SnippetResource($snippet->load('tags')))->response()->setStatusCode(201);
     }
 
     public function show(Snippet $snippet)
     {
         $this->authorize('view', $snippet);
 
-        return response()->json($snippet->load('tags'));
+        return new SnippetResource($snippet->load('tags'));
     }
 
-    public function update(Request $request, Snippet $snippet)
+    public function update(UpdateSnippetRequest $request, Snippet $snippet)
     {
         $this->authorize('update', $snippet);
 
-        $data = $request->validate([
-            'title'      => 'sometimes|required|string|max:255',
-            'content'    => 'sometimes|required|string',
-            'language'   => 'nullable|string|max:50',
-            'folder_id'  => 'nullable|exists:folders,id',
-            'tag_ids'    => 'nullable|array',
-            'tag_ids.*'  => 'integer|exists:tags,id',
-            'tag_names'  => 'nullable|array',
-            'tag_names.*' => 'string|max:50',
-        ]);
+        $data = $request->validated();
 
-        if (array_key_exists('folder_id', $data) && $data['folder_id'] !== null) {
-            $folder = Folder::findOrFail($data['folder_id']);
-            if ($folder->project_id !== $snippet->project_id) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors'  => ['folder_id' => ['Folder does not belong to the snippet\'s project.']],
-                ], 422);
-            }
-        }
+        $this->assertTagsOwnedByUser($request->user(), $data['tag_ids'] ?? []);
 
         $snippet->update(array_filter([
             'title'     => $data['title'] ?? null,
@@ -149,11 +106,11 @@ class SnippetController extends Controller
         }
 
         if (array_key_exists('tag_ids', $data) || array_key_exists('tag_names', $data)) {
-            $tagIds = $this->resolveTagIds($request->user(), $data);
+            $tagIds = $this->tagService->resolveIds($request->user(), $data['tag_ids'] ?? [], $data['tag_names'] ?? []);
             $snippet->tags()->sync($tagIds);
         }
 
-        return response()->json($snippet->load('tags'));
+        return new SnippetResource($snippet->load('tags'));
     }
 
     public function destroy(Snippet $snippet)
@@ -161,70 +118,21 @@ class SnippetController extends Controller
         $this->authorize('delete', $snippet);
         $snippet->delete();
 
-        return response()->json(['message' => 'deleted']);
+        return ['message' => 'deleted'];
     }
 
-    public function search(Request $request)
+    private function assertTagsOwnedByUser($user, array $tagIds): void
     {
-        $request->validate([
-            'q'          => 'required|string|max:200',
-            'project_id' => 'nullable|integer',
-            'folder_id'  => 'nullable|integer',
-            'tag_ids'    => 'nullable|array',
-            'tag_ids.*'  => 'integer',
-            'language'   => 'nullable|string|max:50',
-        ]);
-
-        $userId = $request->user()->id;
-        $filters = ["user_id = $userId"];
-
-        if ($request->project_id) {
-            $filters[] = "project_id = {$request->project_id}";
-        }
-        if ($request->folder_id) {
-            $filters[] = "folder_id = {$request->folder_id}";
+        if (empty($tagIds)) {
+            return;
         }
 
-        $filterString = implode(' AND ', $filters);
+        $foreignCount = \App\Models\Tag::whereIn('id', $tagIds)
+            ->where('user_id', '!=', $user->id)
+            ->count();
 
-        $results = Snippet::search($request->q, function ($meili, $query, $options) use ($filterString) {
-            $options['filter'] = $filterString;
-            return $meili->search($query, $options);
-        })->paginate(20);
-
-        return response()->json($results);
-    }
-
-    private function resolveTagIds($user, array $data): array
-    {
-        $tagIds = [];
-
-        if (!empty($data['tag_ids'])) {
-            $tags = Tag::whereIn('id', $data['tag_ids'])->get();
-
-            foreach ($tags as $tag) {
-                if ($tag->user_id !== $user->id) {
-                    abort(403, 'One or more tags do not belong to you.');
-                }
-                $tagIds[] = $tag->id;
-            }
-
-            if (count($tagIds) !== count($data['tag_ids'])) {
-                abort(422, 'One or more tag IDs are invalid.');
-            }
+        if ($foreignCount > 0) {
+            abort(403, 'One or more tags do not belong to you.');
         }
-
-        if (!empty($data['tag_names'])) {
-            foreach ($data['tag_names'] as $name) {
-                $slug = \Illuminate\Support\Str::slug($name);
-                $tag = $user->tags()->firstOrCreate(
-                    ['slug' => $slug],
-                    ['name' => $name, 'slug' => $slug]
-                );
-                $tagIds[] = $tag->id;
-            }
-        }
-
-        return array_unique($tagIds);
     }
 }

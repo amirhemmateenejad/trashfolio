@@ -67,10 +67,10 @@ test('F69: search results are paginated', function () {
     $response = $this->actingAs($user, 'sanctum')->getJson('/api/search?q=paged-result&per_page=2');
 
     $response->assertStatus(200)
-        ->assertJsonStructure(['data', 'total', 'per_page', 'current_page']);
+        ->assertJsonStructure(['data', 'meta' => ['total', 'per_page', 'current_page']]);
 
-    expect($response->json('per_page'))->toBe(2);
-    expect($response->json('total'))->toBeGreaterThanOrEqual(5);
+    expect($response->json('meta.per_page'))->toBe(2);
+    expect($response->json('meta.total'))->toBeGreaterThanOrEqual(5);
     expect($response->json('data'))->toHaveCount(2);
 });
 

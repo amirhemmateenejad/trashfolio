@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTagRequest;
+use App\Http\Requests\UpdateTagRequest;
+use App\Http\Resources\SnippetResource;
+use App\Http\Resources\TagResource;
 use App\Models\Snippet;
 use App\Models\Tag;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class TagController extends Controller
 {
@@ -13,68 +18,38 @@ class TagController extends Controller
 
     public function index(Request $request)
     {
-        $this->authorize('viewAny', Tag::class);
+        $tags = $request->user()->tags()->orderBy('name')->get();
 
-        return $request->user()->tags()->orderBy('name')->get();
+        return TagResource::collection($tags);
     }
 
-    public function store(Request $request)
+    public function store(StoreTagRequest $request)
     {
-        $this->authorize('create', Tag::class);
-
-        $validated = $request->validate([
-            'name'  => 'required|string|max:50',
-            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
-        ]);
-
-        $slug = \Illuminate\Support\Str::slug($validated['name']);
-
-        if ($request->user()->tags()->where('slug', $slug)->exists()) {
-            return response()->json([
-                'message' => 'The given data was invalid.',
-                'errors'  => ['name' => ['A tag with this name already exists.']],
-            ], 422);
-        }
+        $data = $request->validated();
+        $slug = Str::slug($data['name']);
 
         $tag = $request->user()->tags()->create([
-            'name'  => $validated['name'],
+            'name'  => $data['name'],
             'slug'  => $slug,
-            'color' => $validated['color'] ?? null,
+            'color' => $data['color'] ?? null,
         ]);
 
-        return response()->json($tag, 201);
+        return (new TagResource($tag))->response()->setStatusCode(201);
     }
 
-    public function update(Request $request, Tag $tag)
+    public function update(UpdateTagRequest $request, Tag $tag)
     {
         $this->authorize('update', $tag);
 
-        $validated = $request->validate([
-            'name'  => 'sometimes|required|string|max:50',
-            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
-        ]);
+        $data = $request->validated();
 
-        if (isset($validated['name'])) {
-            $slug = \Illuminate\Support\Str::slug($validated['name']);
-
-            $exists = $request->user()->tags()
-                ->where('slug', $slug)
-                ->where('id', '!=', $tag->id)
-                ->exists();
-
-            if ($exists) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors'  => ['name' => ['A tag with this name already exists.']],
-                ], 422);
-            }
-
-            $validated['slug'] = $slug;
+        if (isset($data['name'])) {
+            $data['slug'] = Str::slug($data['name']);
         }
 
-        $tag->update($validated);
+        $tag->update($data);
 
-        return response()->json($tag);
+        return new TagResource($tag);
     }
 
     public function destroy(Tag $tag)
@@ -82,7 +57,7 @@ class TagController extends Controller
         $this->authorize('delete', $tag);
         $tag->delete();
 
-        return response()->json(['message' => 'deleted']);
+        return ['message' => 'deleted'];
     }
 
     public function attach(Request $request, Snippet $snippet, Tag $tag)
@@ -95,7 +70,7 @@ class TagController extends Controller
 
         $snippet->tags()->syncWithoutDetaching([$tag->id]);
 
-        return response()->json($snippet->load('tags'));
+        return new SnippetResource($snippet->load('tags'));
     }
 
     public function detach(Request $request, Snippet $snippet, Tag $tag)
@@ -108,6 +83,6 @@ class TagController extends Controller
 
         $snippet->tags()->detach($tag->id);
 
-        return response()->json($snippet->load('tags'));
+        return new SnippetResource($snippet->load('tags'));
     }
 }

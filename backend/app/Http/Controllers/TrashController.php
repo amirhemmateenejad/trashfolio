@@ -53,38 +53,32 @@ class TrashController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        return response()->json($paginated);
+        return $paginated;
     }
 
     public function restore(Request $request, string $type, int $id)
     {
         $model = $this->findTrashedOrFail($type, $id);
-
         $this->authorize('restore', $model);
-
         $model->restore();
 
-        return response()->json(['message' => 'restored', 'type' => $type, 'id' => $id]);
+        return ['message' => 'restored', 'type' => $type, 'id' => $id];
     }
 
     public function destroy(Request $request, string $type, int $id)
     {
         $model = $this->findTrashedOrFail($type, $id);
-
         $this->authorize('forceDelete', $model);
-
         $model->forceDelete();
 
-        return response()->json(['message' => 'permanently deleted', 'type' => $type, 'id' => $id]);
+        return ['message' => 'permanently deleted', 'type' => $type, 'id' => $id];
     }
 
     public function empty(Request $request)
     {
         $user = $request->user();
 
-        Project::onlyTrashed()
-            ->where('user_id', $user->id)
-            ->get()
+        Project::onlyTrashed()->where('user_id', $user->id)->get()
             ->each(function ($project) {
                 $this->authorize('forceDelete', $project);
                 $project->forceDelete();
@@ -106,7 +100,7 @@ class TrashController extends Controller
                 $snippet->forceDelete();
             });
 
-        return response()->json(['message' => 'trash emptied']);
+        return ['message' => 'trash emptied'];
     }
 
     private function findTrashedOrFail(string $type, int $id): Project|Folder|Snippet

@@ -176,9 +176,9 @@ test('D50e: project-scoped snippet listing is paginated', function () {
     $response = $this->actingAs($user, 'sanctum')
         ->getJson("/api/projects/{$project->id}/snippets?per_page=2")
         ->assertStatus(200)
-        ->assertJsonStructure(['data', 'total', 'per_page', 'current_page']);
+        ->assertJsonStructure(['data', 'meta' => ['total', 'per_page', 'current_page']]);
 
-    expect($response->json('per_page'))->toBe(2);
-    expect($response->json('total'))->toBeGreaterThanOrEqual(5);
+    expect($response->json('meta.per_page'))->toBe(2);
+    expect($response->json('meta.total'))->toBeGreaterThanOrEqual(5);
     expect($response->json('data'))->toHaveCount(2);
 });

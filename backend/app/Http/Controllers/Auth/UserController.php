@@ -3,27 +3,22 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Requests\Auth\UpdateProfileRequest;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    use AuthorizesRequests;
-
-    public function show()
+    public function show(Request $request)
     {
-        return auth()->user();
+        return new UserResource($request->user());
     }
 
-    public function update()
+    public function update(UpdateProfileRequest $request)
     {
-        request()->validate([
-            'name' => 'required|string|max:255',
-        ]);
+        $user = $request->user();
+        $user->update($request->validated());
 
-        $user = auth()->user();
-        $user->update(['name' => request('name')]);
-
-        return $user;
+        return new UserResource($user);
     }
 }
