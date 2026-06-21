@@ -103,9 +103,13 @@ Branch: `claude/fervent-rubin-26g9k1`
 - [x] Move folder between parents — validation that target is in same project (C34)
 
 ### API Contract & Validation (H)
-- [ ] Consistent JSON error response format across all endpoints (H76)
-- [ ] `per_page` max enforcement on all listing endpoints (J83)
-- [ ] Type validation: `tag_ids` must be array of integers, `color` must be valid hex (H78)
+- [x] Consistent JSON error response format — Form Requests + Resources across all endpoints (H76)
+- [x] `per_page` max enforcement on all listing endpoints (J83)
+- [x] Type validation: `tag_ids` array of integers, `color` valid hex via `HexColor` rule (H78)
+- [x] Form Requests for all controllers (validation separated from controller logic)
+- [x] API Resources for all responses (no raw response()->json())
+- [x] Custom Rules: `HexColor`, `UniqueTagName`, `BelongsToProject`, `NoCyclicParent`
+- [x] `TagService` extracted (resolveIds, resolveNamesForUser)
 
 ### Performance (J)
 - [ ] Eager-load audit: assert no N+1 on snippet listing with tags (J81)
