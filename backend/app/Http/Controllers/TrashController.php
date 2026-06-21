@@ -13,23 +13,31 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class TrashController extends Controller
 {
     use AuthorizesRequests;
+
     public function index(Request $request)
     {
-        $user = $request->user();
-        $perPage = $request->integer('per_page', 20);
-        $page = $request->integer('page', 1);
+        $user    = $request->user();
+        $perPage = min($request->integer('per_page', 20), 100);
+        $page    = max($request->integer('page', 1), 1);
 
         $projects = Project::onlyTrashed()
             ->where('user_id', $user->id)
-            ->get()->map(fn($x) => tap($x, fn() => $x->type = 'project'));
+            ->get()
+            ->toBase()
+            ->map(fn($p) => $this->formatItem($p, 'project'));
 
+        // Folders/snippets resolve ownership through project (which may also be trashed)
         $folders = Folder::onlyTrashed()
-            ->where('user_id', $user->id)
-            ->get()->map(fn($x) => tap($x, fn() => $x->type = 'folder'));
+            ->whereHas('project', fn($q) => $q->withTrashed()->where('user_id', $user->id))
+            ->get()
+            ->toBase()
+            ->map(fn($f) => $this->formatItem($f, 'folder'));
 
         $snippets = Snippet::onlyTrashed()
-            ->where('user_id', $user->id)
-            ->get()->map(fn($x) => tap($x, fn() => $x->type = 'snippet'));
+            ->whereHas('project', fn($q) => $q->withTrashed()->where('user_id', $user->id))
+            ->get()
+            ->toBase()
+            ->map(fn($s) => $this->formatItem($s, 'snippet'));
 
         $combined = $projects
             ->merge($folders)
@@ -38,62 +46,88 @@ class TrashController extends Controller
             ->values();
 
         $paginated = new LengthAwarePaginator(
-            $combined->forPage($page, $perPage),
+            $combined->forPage($page, $perPage)->values(),
             $combined->count(),
             $perPage,
             $page,
-            ['path' => url()->current()]
+            ['path' => $request->url(), 'query' => $request->query()]
         );
 
         return response()->json($paginated);
     }
 
-    public function restore($type, $id)
+    public function restore(Request $request, string $type, int $id)
     {
-        $model = $this->resolveModel($type)::onlyTrashed()->findOrFail($id);
+        $model = $this->findTrashedOrFail($type, $id);
 
         $this->authorize('restore', $model);
 
         $model->restore();
 
-        return response()->json(['message' => 'restored']);
+        return response()->json(['message' => 'restored', 'type' => $type, 'id' => $id]);
     }
 
-    public function empty()
+    public function destroy(Request $request, string $type, int $id)
     {
-        $userId = auth()->id();
+        $model = $this->findTrashedOrFail($type, $id);
+
+        $this->authorize('forceDelete', $model);
+
+        $model->forceDelete();
+
+        return response()->json(['message' => 'permanently deleted', 'type' => $type, 'id' => $id]);
+    }
+
+    public function empty(Request $request)
+    {
+        $user = $request->user();
 
         Project::onlyTrashed()
-            ->where('user_id', $userId)
-            ->get()->each(function($project){
+            ->where('user_id', $user->id)
+            ->get()
+            ->each(function ($project) {
                 $this->authorize('forceDelete', $project);
                 $project->forceDelete();
             });
 
         Folder::onlyTrashed()
-            ->whereHas('project', fn($q) => $q->where('user_id', $userId))
-            ->get()->each(function($project){
-                $this->authorize('forceDelete', $project);
-                $project->forceDelete();
+            ->whereHas('project', fn($q) => $q->withTrashed()->where('user_id', $user->id))
+            ->get()
+            ->each(function ($folder) {
+                $this->authorize('forceDelete', $folder);
+                $folder->forceDelete();
             });
 
         Snippet::onlyTrashed()
-            ->whereHas('project', fn($q) => $q->where('user_id', $userId))
-            ->get()->each(function($project){
-                $this->authorize('forceDelete', $project);
-                $project->forceDelete();
+            ->whereHas('project', fn($q) => $q->withTrashed()->where('user_id', $user->id))
+            ->get()
+            ->each(function ($snippet) {
+                $this->authorize('forceDelete', $snippet);
+                $snippet->forceDelete();
             });
 
         return response()->json(['message' => 'trash emptied']);
     }
 
-    private function resolveModel($type)
+    private function findTrashedOrFail(string $type, int $id): Project|Folder|Snippet
     {
-        return match ($type) {
+        $class = match ($type) {
             'project' => Project::class,
-            'folder' => Folder::class,
+            'folder'  => Folder::class,
             'snippet' => Snippet::class,
-            default => throw new NotFoundHttpException('invalid type'),
+            default   => throw new NotFoundHttpException('Invalid trash type.'),
         };
+
+        return $class::onlyTrashed()->findOrFail($id);
+    }
+
+    private function formatItem(Project|Folder|Snippet $model, string $type): array
+    {
+        return [
+            'type'       => $type,
+            'id'         => $model->id,
+            'title'      => $model->title,
+            'deleted_at' => $model->deleted_at,
+        ];
     }
 }

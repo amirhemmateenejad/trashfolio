@@ -73,12 +73,24 @@ class Snippet extends Model
 
     public function getOwnerUserIdAttribute(): ?int
     {
-        if ($this->project_id && $this->project) {
-            return $this->project->user_id;
+        if ($this->project_id) {
+            $project = $this->relationLoaded('project')
+                ? $this->project
+                : $this->project()->withTrashed()->first();
+
+            if ($project) {
+                return $project->user_id;
+            }
         }
 
-        if ($this->folder_id && $this->folder) {
-            return $this->resolveFolderOwner($this->folder);
+        if ($this->folder_id) {
+            $folder = $this->relationLoaded('folder')
+                ? $this->folder
+                : $this->folder()->withTrashed()->first();
+
+            if ($folder) {
+                return $this->resolveFolderOwner($folder);
+            }
         }
 
         return null;
@@ -86,12 +98,20 @@ class Snippet extends Model
 
     private function resolveFolderOwner($folder): ?int
     {
-        if ($folder->project_id && $folder->project) {
-            return $folder->project->user_id;
+        $project = $folder->relationLoaded('project')
+            ? $folder->project
+            : $folder->project()->withTrashed()->first();
+
+        if ($project) {
+            return $project->user_id;
         }
 
-        if ($folder->parent) {
-            return $this->resolveFolderOwner($folder->parent);
+        $parent = $folder->relationLoaded('parent')
+            ? $folder->parent
+            : $folder->parent()->withTrashed()->first();
+
+        if ($parent) {
+            return $this->resolveFolderOwner($parent);
         }
 
         return null;

@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user', [UserController::class, 'update']);
 
     Route::get('/trash', [TrashController::class, 'index']);
-    Route::post('/trash/restore/{type}/{id}', [TrashController::class, 'restore']);
-    Route::delete('/trash/empty', [TrashController::class, 'empty']);
+    Route::post('/trash/{type}/{id}/restore', [TrashController::class, 'restore']);
+    Route::delete('/trash/{type}/{id}', [TrashController::class, 'destroy']);
+    Route::delete('/trash', [TrashController::class, 'empty']);
 });
