@@ -26,7 +26,10 @@ class ProjectController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        return auth()->user()->projects()->create(request()->only('title', 'description'));
+        return response()->json(
+            auth()->user()->projects()->create(request()->only('title', 'description')),
+            201
+        );
     }
 
     /**

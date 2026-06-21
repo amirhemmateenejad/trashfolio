@@ -5,39 +5,109 @@ namespace App\Http\Controllers;
 use App\Models\Snippet;
 use App\Models\Tag;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
 
 class TagController extends Controller
 {
     use AuthorizesRequests;
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+
+    public function index(Request $request)
     {
-        return Tag::all();
+        $this->authorize('viewAny', Tag::class);
+
+        return $request->user()->tags()->orderBy('name')->get();
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store()
+    public function store(Request $request)
     {
-        request()->validate([
-            'name' => 'required|string|max:50|unique:tags,name',
+        $this->authorize('create', Tag::class);
+
+        $validated = $request->validate([
+            'name'  => 'required|string|max:50',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
-        return Tag::create(request()->only('name'));
+        $slug = \Illuminate\Support\Str::slug($validated['name']);
+
+        if ($request->user()->tags()->where('slug', $slug)->exists()) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors'  => ['name' => ['A tag with this name already exists.']],
+            ], 422);
+        }
+
+        $tag = $request->user()->tags()->create([
+            'name'  => $validated['name'],
+            'slug'  => $slug,
+            'color' => $validated['color'] ?? null,
+        ]);
+
+        return response()->json($tag, 201);
     }
 
-    public function attach(Snippet $snippet, Tag $tag)
+    public function update(Request $request, Tag $tag)
     {
+        $this->authorize('update', $tag);
+
+        $validated = $request->validate([
+            'name'  => 'sometimes|required|string|max:50',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+        ]);
+
+        if (isset($validated['name'])) {
+            $slug = \Illuminate\Support\Str::slug($validated['name']);
+
+            $exists = $request->user()->tags()
+                ->where('slug', $slug)
+                ->where('id', '!=', $tag->id)
+                ->exists();
+
+            if ($exists) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => ['name' => ['A tag with this name already exists.']],
+                ], 422);
+            }
+
+            $validated['slug'] = $slug;
+        }
+
+        $tag->update($validated);
+
+        return response()->json($tag);
+    }
+
+    public function destroy(Tag $tag)
+    {
+        $this->authorize('delete', $tag);
+        $tag->delete();
+
+        return response()->json(['message' => 'deleted']);
+    }
+
+    public function attach(Request $request, Snippet $snippet, Tag $tag)
+    {
+        $this->authorize('update', $snippet);
+
+        if ($tag->user_id !== $request->user()->id) {
+            abort(403, 'This tag does not belong to you.');
+        }
+
         $snippet->tags()->syncWithoutDetaching([$tag->id]);
-        return $snippet->load('tags');
+
+        return response()->json($snippet->load('tags'));
     }
 
-    public function detach(Snippet $snippet, Tag $tag)
+    public function detach(Request $request, Snippet $snippet, Tag $tag)
     {
+        $this->authorize('update', $snippet);
+
+        if ($tag->user_id !== $request->user()->id) {
+            abort(403, 'This tag does not belong to you.');
+        }
+
         $snippet->tags()->detach($tag->id);
-        return $snippet->load('tags');
+
+        return response()->json($snippet->load('tags'));
     }
 }

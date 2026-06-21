@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Folder extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
     protected $fillable = [
         'project_id',
         'parent_id',
@@ -40,14 +41,14 @@ class Folder extends Model
     {
         static::deleting(function ($folder) {
             if (!$folder->isForceDeleting()) {
-                $folder->children()->each->delete();
-                $folder->snippets()->each->delete();
+                $folder->children()->get()->each->delete();
+                $folder->snippets()->get()->each->delete();
             }
         });
 
         static::restoring(function ($folder) {
-            $folder->children()->onlyTrashed()->each->restore();
-            $folder->snippets()->onlyTrashed()->each->restore();
+            $folder->children()->onlyTrashed()->get()->each->restore();
+            $folder->snippets()->onlyTrashed()->get()->each->restore();
         });
     }
 }

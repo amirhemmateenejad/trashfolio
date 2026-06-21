@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -10,12 +11,13 @@ use Laravel\Scout\Searchable;
 
 class Snippet extends Model
 {
-    use SoftDeletes,Searchable;
+    use SoftDeletes, Searchable, HasFactory;
     protected $fillable = [
         'project_id',
         'folder_id',
         'title',
         'content',
+        'language',
     ];
 
     public function project(): BelongsTo
@@ -26,6 +28,13 @@ class Snippet extends Model
     public function folder(): BelongsTo
     {
         return $this->belongsTo(Folder::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Snippet $snippet) {
+            $snippet->tags()->detach();
+        });
     }
 
     public function tags(): BelongsToMany
