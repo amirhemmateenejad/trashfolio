@@ -17,16 +17,19 @@ class Project extends Model
         'description',
     ];
 
+    /** @return BelongsTo<User, Project> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return HasMany<Folder> */
     public function folders(): HasMany
     {
         return $this->hasMany(Folder::class);
     }
 
+    /** @return HasMany<Snippet> */
     public function snippets(): HasMany
     {
         return $this->hasMany(Snippet::class);

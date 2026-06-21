@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AutocompleteController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\TrashController;
+use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\ProjectController;
@@ -21,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Projects
     Route::apiResource('projects', ProjectController::class);
 
+    // Project-scoped snippet listing
+    Route::get('projects/{project}/snippets', [SnippetController::class, 'indexForProject']);
+
     // Folders
     Route::apiResource('folders', FolderController::class)->except(['index']);
 
@@ -34,10 +39,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('snippets/{snippet}/tags/{tag}', [TagController::class, 'attach']);
     Route::delete('snippets/{snippet}/tags/{tag}', [TagController::class, 'detach']);
 
+    // Search
+    Route::get('/search', SearchController::class);
+    Route::get('/autocomplete', AutocompleteController::class);
+
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user', [UserController::class, 'update']);
 
     Route::get('/trash', [TrashController::class, 'index']);
-    Route::post('/trash/restore/{type}/{id}', [TrashController::class, 'restore']);
-    Route::delete('/trash/empty', [TrashController::class, 'empty']);
+    Route::post('/trash/{type}/{id}/restore', [TrashController::class, 'restore']);
+    Route::delete('/trash/{type}/{id}', [TrashController::class, 'destroy']);
+    Route::delete('/trash', [TrashController::class, 'empty']);
 });

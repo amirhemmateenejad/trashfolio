@@ -2,61 +2,134 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Folder;
+use App\Http\Requests\ListSnippetsRequest;
+use App\Http\Requests\StoreSnippetRequest;
+use App\Http\Requests\UpdateSnippetRequest;
+use App\Http\Resources\SnippetResource;
 use App\Models\Project;
 use App\Models\Snippet;
-use App\Models\Tag;
+use App\Services\TagService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class SnippetController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request)
+    public function __construct(private TagService $tagService) {}
+
+    /**
+     * List snippets owned by the authenticated user with optional filters.
+     */
+    #[OA\Get(
+        path: '/snippets',
+        summary: 'List snippets',
+        security: [['bearerAuth' => []]],
+        tags: ['Snippets'],
+        parameters: [
+            new OA\Parameter(name: 'per_page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 20)),
+            new OA\Parameter(name: 'folder_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'language', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Paginated list of snippets'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
+    public function index(ListSnippetsRequest $request)
     {
         $perPage = min($request->integer('per_page', 20), 100);
 
         $snippets = Snippet::query()
-            ->where(function ($q) use ($request) {
-                $q->whereHas('project', fn($q) => $q->where('user_id', $request->user()->id));
-            })
+            ->whereHas('project', fn($q) => $q->where('user_id', $request->user()->id))
+            ->when($request->filled('folder_id'), fn($q) => $q->where('folder_id', $request->integer('folder_id')))
+            ->when($request->filled('language'), fn($q) => $q->where('language', $request->string('language')))
             ->with('tags')
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
-        return response()->json($snippets);
+        return SnippetResource::collection($snippets);
     }
 
-    public function store(Request $request)
+    /**
+     * List snippets belonging to a specific project.
+     */
+    #[OA\Get(
+        path: '/projects/{project}/snippets',
+        summary: 'List snippets for a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Snippets'],
+        parameters: [
+            new OA\Parameter(name: 'project', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'per_page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 20)),
+            new OA\Parameter(name: 'folder_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'language', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Paginated list of snippets'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
+    public function indexForProject(ListSnippetsRequest $request, Project $project)
     {
-        $data = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'folder_id'  => 'nullable|exists:folders,id',
-            'title'      => 'required|string|max:255',
-            'content'    => 'required|string',
-            'language'   => 'nullable|string|max:50',
-            'tag_ids'    => 'nullable|array',
-            'tag_ids.*'  => 'integer|exists:tags,id',
-            'tag_names'  => 'nullable|array',
-            'tag_names.*' => 'string|max:50',
-        ]);
+        $this->authorize('view', $project);
 
+        $perPage = min($request->integer('per_page', 20), 100);
+
+        $snippets = Snippet::query()
+            ->where('project_id', $project->id)
+            ->when($request->filled('folder_id'), fn($q) => $q->where('folder_id', $request->integer('folder_id')))
+            ->when($request->filled('language'), fn($q) => $q->where('language', $request->string('language')))
+            ->with('tags')
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        return SnippetResource::collection($snippets);
+    }
+
+    /**
+     * Create a new snippet, optionally syncing tags.
+     */
+    #[OA\Post(
+        path: '/snippets',
+        summary: 'Create a snippet',
+        security: [['bearerAuth' => []]],
+        tags: ['Snippets'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['project_id', 'title', 'content'],
+                properties: [
+                    new OA\Property(property: 'project_id', type: 'integer'),
+                    new OA\Property(property: 'folder_id', type: 'integer'),
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'content', type: 'string'),
+                    new OA\Property(property: 'language', type: 'string'),
+                    new OA\Property(property: 'tag_ids', type: 'array', items: new OA\Items(type: 'integer')),
+                    new OA\Property(property: 'tag_names', type: 'array', items: new OA\Items(type: 'string')),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Snippet created'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function store(StoreSnippetRequest $request)
+    {
+        $data    = $request->validated();
         $project = Project::findOrFail($data['project_id']);
 
         if ($project->user_id !== $request->user()->id) {
             abort(403);
         }
 
-        if (!empty($data['folder_id'])) {
-            $folder = Folder::findOrFail($data['folder_id']);
-            if ($folder->project_id !== $project->id) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors'  => ['folder_id' => ['Folder does not belong to the specified project.']],
-                ], 422);
-            }
-        }
+        // tag_ids ownership check (403 for foreign tags, consistent with attach/detach behavior)
+        $this->assertTagsOwnedByUser($request->user(), $data['tag_ids'] ?? []);
 
         $snippet = Snippet::create([
             'project_id' => $data['project_id'],
@@ -66,46 +139,79 @@ class SnippetController extends Controller
             'language'   => $data['language'] ?? null,
         ]);
 
-        $tagIds = $this->resolveTagIds($request->user(), $data);
+        $tagIds = $this->tagService->resolveIds($request->user(), $data['tag_ids'] ?? [], $data['tag_names'] ?? []);
 
-        if (!empty($tagIds)) {
+        if ($tagIds) {
             $snippet->tags()->sync($tagIds);
         }
 
-        return response()->json($snippet->load('tags'), 201);
+        return (new SnippetResource($snippet->load('tags')))->response()->setStatusCode(201);
     }
 
+    /**
+     * Get a single snippet with its tags.
+     */
+    #[OA\Get(
+        path: '/snippets/{id}',
+        summary: 'Get a snippet',
+        security: [['bearerAuth' => []]],
+        tags: ['Snippets'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Snippet detail'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function show(Snippet $snippet)
     {
         $this->authorize('view', $snippet);
 
-        return response()->json($snippet->load('tags'));
+        return new SnippetResource($snippet->load('tags'));
     }
 
-    public function update(Request $request, Snippet $snippet)
+    /**
+     * Update an existing snippet and sync its tags.
+     */
+    #[OA\Put(
+        path: '/snippets/{id}',
+        summary: 'Update a snippet',
+        security: [['bearerAuth' => []]],
+        tags: ['Snippets'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'content', type: 'string'),
+                    new OA\Property(property: 'language', type: 'string'),
+                    new OA\Property(property: 'folder_id', type: 'integer'),
+                    new OA\Property(property: 'tag_ids', type: 'array', items: new OA\Items(type: 'integer')),
+                    new OA\Property(property: 'tag_names', type: 'array', items: new OA\Items(type: 'string')),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Updated snippet'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function update(UpdateSnippetRequest $request, Snippet $snippet)
     {
         $this->authorize('update', $snippet);
 
-        $data = $request->validate([
-            'title'      => 'sometimes|required|string|max:255',
-            'content'    => 'sometimes|required|string',
-            'language'   => 'nullable|string|max:50',
-            'folder_id'  => 'nullable|exists:folders,id',
-            'tag_ids'    => 'nullable|array',
-            'tag_ids.*'  => 'integer|exists:tags,id',
-            'tag_names'  => 'nullable|array',
-            'tag_names.*' => 'string|max:50',
-        ]);
+        $data = $request->validated();
 
-        if (array_key_exists('folder_id', $data) && $data['folder_id'] !== null) {
-            $folder = Folder::findOrFail($data['folder_id']);
-            if ($folder->project_id !== $snippet->project_id) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors'  => ['folder_id' => ['Folder does not belong to the snippet\'s project.']],
-                ], 422);
-            }
-        }
+        $this->assertTagsOwnedByUser($request->user(), $data['tag_ids'] ?? []);
 
         $snippet->update(array_filter([
             'title'     => $data['title'] ?? null,
@@ -120,82 +226,51 @@ class SnippetController extends Controller
         }
 
         if (array_key_exists('tag_ids', $data) || array_key_exists('tag_names', $data)) {
-            $tagIds = $this->resolveTagIds($request->user(), $data);
+            $tagIds = $this->tagService->resolveIds($request->user(), $data['tag_ids'] ?? [], $data['tag_names'] ?? []);
             $snippet->tags()->sync($tagIds);
         }
 
-        return response()->json($snippet->load('tags'));
+        return new SnippetResource($snippet->load('tags'));
     }
 
+    /**
+     * Soft-delete a snippet.
+     */
+    #[OA\Delete(
+        path: '/snippets/{id}',
+        summary: 'Delete a snippet',
+        security: [['bearerAuth' => []]],
+        tags: ['Snippets'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Deleted'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function destroy(Snippet $snippet)
     {
         $this->authorize('delete', $snippet);
         $snippet->delete();
 
-        return response()->json(['message' => 'deleted']);
+        return ['message' => 'deleted'];
     }
 
-    public function search(Request $request)
+    private function assertTagsOwnedByUser($user, array $tagIds): void
     {
-        $request->validate([
-            'q'          => 'required|string|max:200',
-            'project_id' => 'nullable|integer',
-            'folder_id'  => 'nullable|integer',
-            'tag_ids'    => 'nullable|array',
-            'tag_ids.*'  => 'integer',
-            'language'   => 'nullable|string|max:50',
-        ]);
-
-        $userId = $request->user()->id;
-        $filters = ["user_id = $userId"];
-
-        if ($request->project_id) {
-            $filters[] = "project_id = {$request->project_id}";
-        }
-        if ($request->folder_id) {
-            $filters[] = "folder_id = {$request->folder_id}";
+        if (empty($tagIds)) {
+            return;
         }
 
-        $filterString = implode(' AND ', $filters);
+        $foreignCount = \App\Models\Tag::whereIn('id', $tagIds)
+            ->where('user_id', '!=', $user->id)
+            ->count();
 
-        $results = Snippet::search($request->q, function ($meili, $query, $options) use ($filterString) {
-            $options['filter'] = $filterString;
-            return $meili->search($query, $options);
-        })->paginate(20);
-
-        return response()->json($results);
-    }
-
-    private function resolveTagIds($user, array $data): array
-    {
-        $tagIds = [];
-
-        if (!empty($data['tag_ids'])) {
-            $tags = Tag::whereIn('id', $data['tag_ids'])->get();
-
-            foreach ($tags as $tag) {
-                if ($tag->user_id !== $user->id) {
-                    abort(403, 'One or more tags do not belong to you.');
-                }
-                $tagIds[] = $tag->id;
-            }
-
-            if (count($tagIds) !== count($data['tag_ids'])) {
-                abort(422, 'One or more tag IDs are invalid.');
-            }
+        if ($foreignCount > 0) {
+            abort(403, 'One or more tags do not belong to you.');
         }
-
-        if (!empty($data['tag_names'])) {
-            foreach ($data['tag_names'] as $name) {
-                $slug = \Illuminate\Support\Str::slug($name);
-                $tag = $user->tags()->firstOrCreate(
-                    ['slug' => $slug],
-                    ['name' => $name, 'slug' => $slug]
-                );
-                $tagIds[] = $tag->id;
-            }
-        }
-
-        return array_unique($tagIds);
     }
 }

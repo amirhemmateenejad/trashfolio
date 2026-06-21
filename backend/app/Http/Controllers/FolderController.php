@@ -2,80 +2,140 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreFolderRequest;
+use App\Http\Requests\UpdateFolderRequest;
+use App\Http\Resources\FolderResource;
 use App\Models\Folder;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class FolderController extends Controller
 {
     use AuthorizesRequests;
+
     /**
-     * Store a newly created resource in storage.
+     * Create a new folder within a project.
      */
-    public function store(Request $request)
+    #[OA\Post(
+        path: '/folders',
+        summary: 'Create a folder',
+        security: [['bearerAuth' => []]],
+        tags: ['Folders'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['project_id', 'title'],
+                properties: [
+                    new OA\Property(property: 'project_id', type: 'integer'),
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'parent_id', type: 'integer'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Folder created'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function store(StoreFolderRequest $request)
     {
-        $validated = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'parent_id'  => 'nullable|exists:folders,id',
-            'title'      => 'required|string|max:255',
-        ]);
-
-        $project = Project::findOrFail($validated['project_id']);
-
-        if ($validated['parent_id'] ?? false) {
-            $parent = Folder::findOrFail($validated['parent_id']);
-
-            if ($parent->project->user_id !== $request->user()->id || $parent->project_id !== $project->id) {
-                abort(403, 'Invalid parent folder');
-            }
-        }
-
-        $project = Project::find($validated['project_id']);
+        $project = Project::findOrFail($request->validated('project_id'));
 
         $this->authorize('create', [Folder::class, $project]);
 
-        $folder = Folder::create([
-            'project_id' => $project->id,
-            'parent_id'  => $validated['parent_id'] ?? null,
-            'title'      => $validated['title'],
-        ]);
+        $folder = Folder::create($request->validated());
 
-        return response()->json($folder, 201);
+        return (new FolderResource($folder))->response()->setStatusCode(201);
     }
 
     /**
-     * Display the specified resource.
+     * Get a single folder with its children and snippets.
      */
+    #[OA\Get(
+        path: '/folders/{id}',
+        summary: 'Get a folder',
+        security: [['bearerAuth' => []]],
+        tags: ['Folders'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Folder detail'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function show(Folder $folder)
     {
         $this->authorize('view', $folder);
-        return $folder->load(['children', 'snippets']);
+
+        return new FolderResource($folder->load(['children.snippets', 'snippets']));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update an existing folder.
      */
-    public function update(Request $request,Folder $folder)
+    #[OA\Put(
+        path: '/folders/{id}',
+        summary: 'Update a folder',
+        security: [['bearerAuth' => []]],
+        tags: ['Folders'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'parent_id', type: 'integer'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Updated folder'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function update(UpdateFolderRequest $request, Folder $folder)
     {
         $this->authorize('update', $folder);
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-        ]);
+        $folder->update($request->validated());
 
-        $folder->update($validated);
-
-        return response()->json($folder);
+        return new FolderResource($folder);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Soft-delete a folder (cascades to children and snippets).
      */
+    #[OA\Delete(
+        path: '/folders/{id}',
+        summary: 'Delete a folder',
+        security: [['bearerAuth' => []]],
+        tags: ['Folders'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Deleted'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function destroy(Folder $folder)
     {
         $this->authorize('delete', $folder);
         $folder->delete();
-        return response()->json(['message' => 'deleted']);
+
+        return ['message' => 'deleted'];
     }
 }

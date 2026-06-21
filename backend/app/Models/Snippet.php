@@ -20,11 +20,13 @@ class Snippet extends Model
         'language',
     ];
 
+    /** @return BelongsTo<Project, Snippet> */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
     }
 
+    /** @return BelongsTo<Folder, Snippet> */
     public function folder(): BelongsTo
     {
         return $this->belongsTo(Folder::class);
@@ -37,11 +39,17 @@ class Snippet extends Model
         });
     }
 
+    /** @return BelongsToMany<Tag> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'snippet_tag');
     }
 
+    /**
+     * Build the array used to index this snippet in Meilisearch.
+     *
+     * @return array
+     */
     public function toSearchableArray(): array
     {
         // همه روابط لازم را لود کن، تا indexing کامل باشد
@@ -60,37 +68,74 @@ class Snippet extends Model
             'folder_id'  => $this->folder_id,
             'title'      => $this->title,
             'content'    => $this->content,
+            'language'   => $this->language,
             'tags'       => $this->tags->pluck('name')->toArray(),
             'created_at' => optional($this->created_at)->timestamp,
         ];
     }
 
+    /**
+     * Exclude soft-deleted snippets from the search index.
+     *
+     * @return bool
+     */
     public function shouldBeSearchable(): bool
     {
         return $this->deleted_at === null;
     }
 
+    /**
+     * Resolve the owning user ID through the project or folder relationship.
+     *
+     * @return int|null
+     */
     public function getOwnerUserIdAttribute(): ?int
     {
-        if ($this->project_id && $this->project) {
-            return $this->project->user_id;
+        if ($this->project_id) {
+            $project = $this->relationLoaded('project')
+                ? $this->project
+                : $this->project()->withTrashed()->first();
+
+            if ($project) {
+                return $project->user_id;
+            }
         }
 
-        if ($this->folder_id && $this->folder) {
-            return $this->resolveFolderOwner($this->folder);
+        if ($this->folder_id) {
+            $folder = $this->relationLoaded('folder')
+                ? $this->folder
+                : $this->folder()->withTrashed()->first();
+
+            if ($folder) {
+                return $this->resolveFolderOwner($folder);
+            }
         }
 
         return null;
     }
 
+    /**
+     * Walk up the folder hierarchy to find the owning user ID.
+     *
+     * @param Folder $folder
+     * @return int|null
+     */
     private function resolveFolderOwner($folder): ?int
     {
-        if ($folder->project_id && $folder->project) {
-            return $folder->project->user_id;
+        $project = $folder->relationLoaded('project')
+            ? $folder->project
+            : $folder->project()->withTrashed()->first();
+
+        if ($project) {
+            return $project->user_id;
         }
 
-        if ($folder->parent) {
-            return $this->resolveFolderOwner($folder->parent);
+        $parent = $folder->relationLoaded('parent')
+            ? $folder->parent
+            : $folder->parent()->withTrashed()->first();
+
+        if ($parent) {
+            return $this->resolveFolderOwner($parent);
         }
 
         return null;

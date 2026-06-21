@@ -13,7 +13,7 @@ class FolderPolicy
 
     public function view(User $user, Folder $folder): bool
     {
-        return $folder->project->user_id === $user->id;
+        return $this->ownsFolder($user, $folder);
     }
 
     public function create(User $user, Project $project): bool
@@ -23,21 +23,29 @@ class FolderPolicy
 
     public function update(User $user, Folder $folder): bool
     {
-        return $folder->project->user_id === $user->id;
+        return $this->ownsFolder($user, $folder);
     }
 
     public function delete(User $user, Folder $folder): bool
     {
-        return $folder->project->user_id === $user->id;
+        return $this->ownsFolder($user, $folder);
     }
 
     public function restore(User $user, Folder $folder): bool
     {
-        return $folder->project->user_id === $user->id;
+        return $this->ownsFolder($user, $folder);
     }
 
     public function forceDelete(User $user, Folder $folder): bool
     {
-        return false;
+        return $this->ownsFolder($user, $folder);
+    }
+
+    private function ownsFolder(User $user, Folder $folder): bool
+    {
+        // The folder's project may itself be soft-deleted; withTrashed() ensures it's loaded
+        $project = $folder->project()->withTrashed()->first();
+
+        return $project && $project->user_id === $user->id;
     }
 }

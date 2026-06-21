@@ -33,11 +33,13 @@ class Tag extends Model
         });
     }
 
+    /** @return BelongsTo<User, Tag> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsToMany<Snippet> */
     public function snippets(): BelongsToMany
     {
         return $this->belongsToMany(Snippet::class, 'snippet_tag');

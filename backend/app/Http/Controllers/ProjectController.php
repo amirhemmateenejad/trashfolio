@@ -2,69 +2,158 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\UpdateProjectRequest;
+use App\Http\Resources\ProjectResource;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class ProjectController extends Controller
 {
     use AuthorizesRequests;
+
     /**
-     * Display a listing of the resource.
+     * List all projects for the authenticated user.
      */
-    public function index()
+    #[OA\Get(
+        path: '/projects',
+        summary: 'List user projects',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'per_page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 20)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Paginated list of projects'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
+    public function index(Request $request)
     {
-        return auth()->user()->projects()->latest()->get();
+        $perPage  = min($request->integer('per_page', 20), 100);
+        $projects = $request->user()->projects()->latest()->paginate($perPage);
+
+        return ProjectResource::collection($projects);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Create a new project for the authenticated user.
      */
-    public function store()
+    #[OA\Post(
+        path: '/projects',
+        summary: 'Create a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['title'],
+                properties: [
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'description', type: 'string'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Project created'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function store(StoreProjectRequest $request)
     {
-        request()->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-        ]);
+        $project = $request->user()->projects()->create($request->validated());
 
-        return response()->json(
-            auth()->user()->projects()->create(request()->only('title', 'description')),
-            201
-        );
+        return (new ProjectResource($project))->response()->setStatusCode(201);
     }
 
     /**
-     * Display the specified resource.
+     * Get a single project with its folders and snippets.
      */
+    #[OA\Get(
+        path: '/projects/{id}',
+        summary: 'Get a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Project detail'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function show(Project $project)
     {
         $this->authorize('view', $project);
-        return $project->load(['folders', 'snippets']);
+
+        return new ProjectResource($project->load(['folders', 'snippets']));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update an existing project.
      */
-    public function update(Project $project)
+    #[OA\Put(
+        path: '/projects/{id}',
+        summary: 'Update a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'description', type: 'string'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Updated project'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function update(UpdateProjectRequest $request, Project $project)
     {
         $this->authorize('update', $project);
 
-        request()->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-        ]);
+        $project->update($request->validated());
 
-        $project->update(request()->only('title', 'description'));
-        return $project;
+        return new ProjectResource($project);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Soft-delete a project (cascades to folders and snippets).
      */
+    #[OA\Delete(
+        path: '/projects/{id}',
+        summary: 'Delete a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Deleted'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function destroy(Project $project)
     {
         $this->authorize('delete', $project);
         $project->delete();
 
-        return response()->json(['message' => 'deleted']);
+        return ['message' => 'deleted'];
     }
 }

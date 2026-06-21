@@ -74,7 +74,7 @@ test('D40: can attach existing tags by tag_ids on create', function () {
 
     $response->assertStatus(201);
     $this->assertDatabaseHas('snippet_tag', [
-        'snippet_id' => $response->json('id'),
+        'snippet_id' => $response->json('data.id'),
         'tag_id'     => $tag->id,
     ]);
 });
@@ -109,7 +109,7 @@ test('D41: tag_names creates new tags for user and attaches them', function () {
 
     $this->assertDatabaseHas('tags', ['user_id' => $user->id, 'slug' => 'laravel']);
     $this->assertDatabaseHas('tags', ['user_id' => $user->id, 'slug' => 'php']);
-    expect($response->json('tags'))->toHaveCount(2);
+    expect($response->json('data.tags'))->toHaveCount(2);
 });
 
 // D2 – Update Snippet

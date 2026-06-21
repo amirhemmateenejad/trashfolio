@@ -47,7 +47,7 @@ test('C29b: parent_id must belong to same project', function () {
         'project_id' => $project->id,
         'parent_id'  => $folder->id,
         'title'      => 'Child',
-    ])->assertStatus(403);
+    ])->assertStatus(422);
 });
 
 // C3 – Update & Delete
