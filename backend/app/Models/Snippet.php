@@ -60,6 +60,7 @@ class Snippet extends Model
             'folder_id'  => $this->folder_id,
             'title'      => $this->title,
             'content'    => $this->content,
+            'language'   => $this->language,
             'tags'       => $this->tags->pluck('name')->toArray(),
             'created_at' => optional($this->created_at)->timestamp,
         ];
