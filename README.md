@@ -1,21 +1,24 @@
 # Trashfolio
 
-Trashfolio is a developer-focused snippet manager designed to organize, tag, and quickly retrieve code snippets.
+Trashfolio is a personal developer snippet manager designed to organize, store, and retrieve code snippets efficiently.
 
-It provides a clean interface, structured organization, and fast search for developers who collect useful code fragments during daily work.
+It focuses on fast access, structured organization, and a clean developer‑friendly interface.
+
+The project is built as a monorepo containing a Laravel backend API and a Vue SPA frontend.
 
 ---
 
-## Features
+## Core Features
 
-- OTP based authentication
-- Project-based snippet organization
+- Mobile OTP authentication
+- Personal projects
 - Nested folders
+- Code snippets
 - Tagging system
-- Full-text search
+- Full‑text search
 - Dark mode interface
 - REST API backend
-- Test-driven development
+- Test‑driven development workflow
 
 ---
 
@@ -24,7 +27,8 @@ It provides a clean interface, structured organization, and fast search for deve
 Backend
 - Laravel
 - Laravel Sanctum
-- MySQL / PostgreSQL
+- MySQL
+- Meilisearch
 
 Frontend
 - Vue 3
@@ -37,30 +41,34 @@ Frontend
 
 ---
 
-## Architecture
+## Monorepo Structure
 
-Trashfolio is structured as a monorepo:
-backend/ Laravel API
+backend/
 
-client/ Vue SPA
+Laravel REST API
 
+client/
 
-The backend exposes a REST API while the frontend is a Single Page Application.
+Vue Single Page Application
+
+The backend exposes an API and does not render server-side views.
 
 ---
 
 ## Authentication
 
-Authentication is based on mobile OTP.
+Authentication uses mobile OTP.
 
 Flow:
 
-1. Request OTP
-2. Verify OTP
-3. User account created automatically
-4. Sanctum token issued
+1. User requests OTP
+2. OTP is generated and stored
+3. User submits OTP
+4. OTP is verified
+5. User is created or logged in
+6. Sanctum token is issued
 
-No passwords are used.
+The system does not use passwords.
 
 ---
 
@@ -87,17 +95,30 @@ pnpm dev
 
 ## Testing
 
-The backend follows a strict Test Driven Development workflow using **Pest**.
+The backend follows a Test Driven Development (TDD) workflow using Pest.
 
-All feature and integration scenarios are documented in: TEST_SCENARIOS.md
+All testing scenarios are documented in:
 
+TEST_SCENARIOS.md
 
 ---
 
-## Roadmap
+## Documentation
 
-- advanced snippet search
-- snippet sharing
-- import/export
-- command palette
-- AI powered snippet suggestions
+Additional project documentation:
+
+ARCHITECTURE.md
+
+DOMAIN_MODEL.md
+
+API_SPEC.md
+
+ROADMAP.md
+
+CLAUDE_HANDOFF.md
+
+## Project Status
+
+Trashfolio is currently in MVP development stage.
+
+The focus is building a stable personal snippet management system before adding sharing or collaboration features.
