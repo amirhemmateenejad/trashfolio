@@ -17,26 +17,36 @@ class Folder extends Model
         'title',
     ];
 
+    /** @return BelongsTo<Project, Folder> */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
     }
 
+    /** @return BelongsTo<Folder, Folder> */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Folder::class, 'parent_id');
     }
 
+    /** @return HasMany<Folder> */
     public function children(): HasMany
     {
         return $this->hasMany(Folder::class, 'parent_id');
     }
 
+    /** @return HasMany<Snippet> */
     public function snippets(): HasMany
     {
         return $this->hasMany(Snippet::class);
     }
 
+    /**
+     * Determine whether this folder is an ancestor of the given folder ID.
+     *
+     * @param int $folderId
+     * @return bool
+     */
     public function isAncestorOf(int $folderId): bool
     {
         $visited = [];

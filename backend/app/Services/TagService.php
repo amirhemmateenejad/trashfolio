@@ -12,6 +12,11 @@ class TagService
      * Resolve a final list of tag IDs from explicit IDs and/or name strings.
      * Assumes tag_ids have already been validated as existing and user-owned.
      * tag_names are auto-created for the user if they don't exist.
+     *
+     * @param User $user
+     * @param array $tagIds  Already-validated tag IDs
+     * @param array $tagNames  Tag names to find-or-create
+     * @return array<int>
      */
     public function resolveIds(User $user, array $tagIds = [], array $tagNames = []): array
     {
@@ -32,6 +37,10 @@ class TagService
     /**
      * Resolve tag names from IDs belonging to the given user.
      * IDs belonging to other users are silently ignored.
+     *
+     * @param User $user
+     * @param array $tagIds
+     * @return array<string>
      */
     public function resolveNamesForUser(User $user, array $tagIds): array
     {

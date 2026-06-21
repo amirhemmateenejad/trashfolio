@@ -8,8 +8,19 @@ use Illuminate\Contracts\Validation\ValidationRule;
 
 class NoCyclicParent implements ValidationRule
 {
+    /**
+     * @param Folder $folder  The folder being updated
+     */
     public function __construct(private Folder $folder) {}
 
+    /**
+     * Validate that assigning the given parent ID does not create a cycle.
+     *
+     * @param string $attribute
+     * @param mixed $value  Proposed parent folder ID
+     * @param Closure $fail
+     * @return void
+     */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         $newParentId = (int) $value;

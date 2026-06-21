@@ -8,8 +8,19 @@ use Illuminate\Contracts\Validation\ValidationRule;
 
 class BelongsToProject implements ValidationRule
 {
+    /**
+     * @param int|null $projectId  The project the folder must belong to
+     */
     public function __construct(private ?int $projectId) {}
 
+    /**
+     * Validate that the folder belongs to the given project.
+     *
+     * @param string $attribute
+     * @param mixed $value  Folder ID
+     * @param Closure $fail
+     * @return void
+     */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (!$this->projectId) {

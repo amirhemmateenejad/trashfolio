@@ -6,9 +6,28 @@ use App\Http\Requests\AutocompleteRequest;
 use App\Models\Project;
 use App\Models\Snippet;
 use App\Models\Tag;
+use OpenApi\Attributes as OA;
 
 class AutocompleteController extends Controller
 {
+    /**
+     * Return type-ahead suggestions for snippets, tags, and/or projects.
+     */
+    #[OA\Get(
+        path: '/autocomplete',
+        summary: 'Autocomplete suggestions',
+        security: [['bearerAuth' => []]],
+        tags: ['Autocomplete'],
+        parameters: [
+            new OA\Parameter(name: 'q', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 5)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Autocomplete results keyed by type'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
     public function __invoke(AutocompleteRequest $request)
     {
         $user  = $request->user();

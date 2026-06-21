@@ -6,9 +6,29 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RefreshTokenRequest;
 use App\Models\RefreshToken;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 
 class AuthController extends Controller
 {
+    /**
+     * Exchange a valid refresh token for a new access/refresh token pair.
+     */
+    #[OA\Post(
+        path: '/auth/refresh',
+        summary: 'Refresh access token',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['refresh_token'],
+                properties: [new OA\Property(property: 'refresh_token', type: 'string')]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'New tokens issued'),
+            new OA\Response(response: 401, description: 'Invalid or expired refresh token'),
+        ]
+    )]
     public function refresh(RefreshTokenRequest $request)
     {
         $old = RefreshToken::where('token', $request->validated('refresh_token'))->first();

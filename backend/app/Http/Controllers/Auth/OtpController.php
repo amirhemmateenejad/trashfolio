@@ -11,11 +11,32 @@ use App\Models\User;
 use App\Services\Otp\OtpService;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 
 class OtpController extends Controller
 {
     public function __construct(protected OtpService $otp) {}
 
+    /**
+     * Send an OTP code to the given mobile number.
+     */
+    #[OA\Post(
+        path: '/auth/login',
+        summary: 'Request OTP for login',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['mobile'],
+                properties: [new OA\Property(property: 'mobile', type: 'string', example: '+989123456789')]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'OTP sent'),
+            new OA\Response(response: 422, description: 'Validation error'),
+            new OA\Response(response: 429, description: 'Rate limited'),
+        ]
+    )]
     public function login(LoginRequest $request)
     {
         $mobile = $request->validated('mobile');
@@ -32,6 +53,29 @@ class OtpController extends Controller
         return ['message' => 'OTP sent'];
     }
 
+    /**
+     * Verify OTP code and return access/refresh tokens.
+     */
+    #[OA\Post(
+        path: '/auth/verify',
+        summary: 'Verify OTP and authenticate',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['mobile', 'code'],
+                properties: [
+                    new OA\Property(property: 'mobile', type: 'string'),
+                    new OA\Property(property: 'code', type: 'string'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Authenticated, returns tokens and user'),
+            new OA\Response(response: 422, description: 'Invalid OTP'),
+            new OA\Response(response: 429, description: 'Rate limited'),
+        ]
+    )]
     public function verify(VerifyOtpRequest $request)
     {
         $data = $request->validated();

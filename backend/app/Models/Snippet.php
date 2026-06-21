@@ -20,11 +20,13 @@ class Snippet extends Model
         'language',
     ];
 
+    /** @return BelongsTo<Project, Snippet> */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
     }
 
+    /** @return BelongsTo<Folder, Snippet> */
     public function folder(): BelongsTo
     {
         return $this->belongsTo(Folder::class);
@@ -37,11 +39,17 @@ class Snippet extends Model
         });
     }
 
+    /** @return BelongsToMany<Tag> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'snippet_tag');
     }
 
+    /**
+     * Build the array used to index this snippet in Meilisearch.
+     *
+     * @return array
+     */
     public function toSearchableArray(): array
     {
         // همه روابط لازم را لود کن، تا indexing کامل باشد
@@ -66,11 +74,21 @@ class Snippet extends Model
         ];
     }
 
+    /**
+     * Exclude soft-deleted snippets from the search index.
+     *
+     * @return bool
+     */
     public function shouldBeSearchable(): bool
     {
         return $this->deleted_at === null;
     }
 
+    /**
+     * Resolve the owning user ID through the project or folder relationship.
+     *
+     * @return int|null
+     */
     public function getOwnerUserIdAttribute(): ?int
     {
         if ($this->project_id) {
@@ -96,6 +114,12 @@ class Snippet extends Model
         return null;
     }
 
+    /**
+     * Walk up the folder hierarchy to find the owning user ID.
+     *
+     * @param Folder $folder
+     * @return int|null
+     */
     private function resolveFolderOwner($folder): ?int
     {
         $project = $folder->relationLoaded('project')
